@@ -1,12 +1,10 @@
 package main
 
 import (
-	linkList "dataStructAlg/linkList/singleLinkedList"
-	"fmt"
+	graph "dataStructAlg/graph/adjacency_list"
 )
 
 func main() {
-	head := linkList.NewLinkList()
-	linkList.Insert(head, 5)
-	fmt.Println(head.Next.Data)
+	ga := graph.CreatAdjList(true)
+	ga.Dijkstra(0)
 }

@@ -12,12 +12,12 @@ func NewStack() *Node {
 }
 
 //判断栈是否为空
-func IsEmpty(s *Node) bool {
+func (s *Node) IsEmpty() bool {
 	return s.Next == nil
 }
 
 //进栈操作，链表的前端作为栈顶
-func Push(s *Node, data int) {
+func (s *Node) Push(data int) {
 	n := &Node{}
 	n.Data = data
 	n.Next = s.Next
@@ -25,8 +25,8 @@ func Push(s *Node, data int) {
 }
 
 //出栈操作
-func Pop(s *Node) int {
-	if IsEmpty(s) {
+func (s *Node) Pop() int {
+	if s.IsEmpty() {
 		return 0
 	}
 	n := s.Next.Data
@@ -35,8 +35,8 @@ func Pop(s *Node) int {
 }
 
 //获取栈顶元素，但不出栈
-func Top(s *Node) int {
-	if IsEmpty(s) {
+func (s *Node) Top() int {
+	if s.IsEmpty() {
 		return 0
 	}
 	return s.Next.Data
