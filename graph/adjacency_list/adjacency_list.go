@@ -1,13 +1,16 @@
 package graph
 
 import (
+	"container/heap"
 	"fmt"
+
+	set "dataStructAlg/set/disjoint_set"
 
 	"gopkg.in/eapache/queue.v1"
 )
 
 const N = 7            //图的顶点数
-const E = 12           //图的边数
+const E = 10           //图的边数
 const Infinity = 10000 //路径长度未知或不可达
 
 type vextype string    //定义顶点的数据信息类型
@@ -21,12 +24,14 @@ type vexnode struct {
 	In     int       //入度域
 	Link   *edgenode //指针域
 }
-type GraphList []vexnode //顶点表
-type pathTable struct {  //簿记表数据结构
+type GraphList []vexnode      //顶点表
+type book_keeepTable struct { //簿记表数据结构
 	Known bool
 	Dist  int
 	Path  int
 }
+
+var visited [N]int //顶点遍历标记
 
 // 生成图的邻接表
 func CreatAdjList(digraph bool) GraphList {
@@ -68,6 +73,40 @@ func (ga GraphList) Print() {
 		fmt.Println()
 	}
 	fmt.Println("/*******************************/")
+}
+
+// 深度优先遍历（DFS）
+func (ga GraphList) Dfs(i int) {
+	fmt.Println(ga[i].Vertex) //访问顶点Vi
+	visited[i] = 1            //标记Vi已被访问
+	p := ga[i].Link
+	for p != nil { //遍历Vi的邻接顶点
+		if visited[p.Adjvex] == 0 {
+			ga.Dfs(p.Adjvex)
+		}
+		p = p.Next
+	}
+}
+
+// 广度优先搜索遍历（BFS）
+func (ga GraphList) Bfs(i int) {
+	var m int
+	q := queue.New()
+	fmt.Println(ga[i].Vertex) //访问出发顶点Vi
+	visited[i] = 1
+	q.Add(i) //访问过的顶点序号入队列
+	for q.Length() != 0 {
+		m = q.Remove().(int)
+		p := ga[m].Link //取Vm的边表头指针
+		for p != nil {
+			if visited[p.Adjvex] == 0 {
+				fmt.Println(ga[p.Adjvex].Vertex)
+				visited[p.Adjvex] = 1
+				q.Add(p.Adjvex)
+			}
+			p = p.Next
+		}
+	}
 }
 
 /*
@@ -125,7 +164,7 @@ func (ga GraphList) TopoSort() {
 /*
 func (ga GraphList) Unweighted(s int) {
 	// 声明并初始化簿记表
-	var t [N]pathTable
+	var t [N]book_keeepTable
 	for i := 0; i < N; i++ {
 		if s == i {
 			continue
@@ -157,10 +196,10 @@ func (ga GraphList) Unweighted(s int) {
 */
 
 // 优化后的无权最短路径算法
-// 使用 第三方的队列库
+// 使用了第三方的队列库
 func (ga GraphList) Unweighted(s int) {
 	// 声明并初始化簿记表
-	var t [N]pathTable
+	var t [N]book_keeepTable
 	for i := 0; i < N; i++ {
 		if s == i {
 			continue
@@ -194,7 +233,7 @@ func (ga GraphList) Unweighted(s int) {
 // 普通实现
 func (ga GraphList) Dijkstra(s int) {
 	// 声明并初始化簿记表
-	var t [N]pathTable
+	var t [N]book_keeepTable
 	for i := 0; i < N; i++ {
 		if s == i {
 			continue
@@ -204,7 +243,7 @@ func (ga GraphList) Dijkstra(s int) {
 	}
 
 	for {
-		// 通遍历的方式查找距离最小位置顶点，查找操作的时间复杂的为O(|V|^2)；
+		// 通遍历的方式查找距离最小位置顶点，整个算法查找最小值花费的时间为O(|V|^2)；
 		// todo:
 		// 可以使用DeleteMin操作来实现，因为一旦未知的最小值顶点被找到，那么它就不再是未知的，以后不再考虑。
 		// 二叉堆DeleteMin操作的时间复杂度为O(logN)
@@ -251,5 +290,235 @@ func (ga GraphList) Dijkstra(s int) {
 	// 打印簿记表
 	for i, item := range t {
 		fmt.Printf("V%d %v %d V%d\n", i+1, item.Known, item.Dist, item.Path+1)
+	}
+}
+
+// 具有负边值的图
+func (ga GraphList) WeightedNegative(s int) {
+	var counts [N]int //顶点出队次数计数器
+	// 声明并初始化簿记表
+	var t [N]book_keeepTable
+	for i := 0; i < N; i++ {
+		if s == i {
+			continue
+		}
+		t[i].Dist = Infinity
+	}
+	q := queue.New()
+	q.Add(s)          //起始顶点入队
+	t[s].Known = true //标记顶点入队
+	for q.Length() != 0 {
+		v := q.Remove().(int)
+		t[v].Known = false //标记顶点出队
+		counts[v]++        //顶点出队计数器加一
+		//针对存在负值圈的情况，使算法能够终止运行
+		if counts[v] <= N {
+			//遍历邻接顶点，需保留原邻接表
+			// 所以不能直接使用ga[v].Link = ga[v].Link.Next，这会导致顶点二次进入队列时，邻接表为空
+			link := ga[v].Link
+			for link != nil {
+				if t[v].Dist+link.Weight < t[link.Adjvex].Dist {
+					t[link.Adjvex].Dist = t[v].Dist + link.Weight
+					t[link.Adjvex].Path = v
+					//如果邻接顶点不在队列中，则将其入队
+					if !t[link.Adjvex].Known {
+						q.Add(link.Adjvex)
+						t[link.Adjvex].Known = true
+					}
+				}
+				link = link.Next
+			}
+		} else {
+			fmt.Println("图中存在负值圈")
+			return
+		}
+	}
+	// 打印簿记表
+	for i, item := range t {
+		fmt.Printf("V%d %v %d V%d\n", i+1, item.Known, item.Dist, item.Path+1)
+	}
+}
+
+// Prim算法
+func (ga GraphList) Prim(s int) {
+	// 声明并初始化簿记表
+	var t [N]book_keeepTable
+	for i := 0; i < N; i++ {
+		if s == i {
+			continue
+		}
+		t[i].Dist = Infinity
+		t[i].Path = -1
+	}
+
+	for {
+		v := -1
+		min := Infinity + 1
+		for i, item := range t { //获取未知顶点中距离最小的
+			if !item.Known && item.Dist < min {
+				min = item.Dist
+				v = i
+			}
+		}
+		if v == -1 { //全部顶点已知
+			break
+		}
+		if t[v].Path == -1 {
+			break
+		}
+
+		t[v].Known = true
+		//遍历该顶点的全部邻接顶点
+		for ga[v].Link != nil {
+			if !t[ga[v].Link.Adjvex].Known {
+				// 对于每个与v邻接的未知顶点w，Dw=min(Dw, Cw,v)
+				if ga[v].Link.Weight < t[ga[v].Link.Adjvex].Dist {
+					t[ga[v].Link.Adjvex].Dist = ga[v].Link.Weight
+					t[ga[v].Link.Adjvex].Path = v
+				}
+			}
+			ga[v].Link = ga[v].Link.Next
+		}
+	}
+	// 打印簿记表
+	for i, item := range t {
+		fmt.Printf("V%d %v %d V%d\n", i+1, item.Known, item.Dist, item.Path+1)
+	}
+}
+
+// Kruskal算法
+type edge struct { //定义边
+	From   int
+	To     int
+	Weight int
+}
+type edgeHeap []edge
+
+func (h edgeHeap) Len() int           { return len(h) }
+func (h edgeHeap) Less(i, j int) bool { return h[i].Weight < h[j].Weight }
+func (h edgeHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+
+func (h *edgeHeap) Push(x any) {
+	// Push and Pop use pointer receivers because they modify the slice's length,
+	// not just its contents.
+	*h = append(*h, x.(edge))
+}
+
+func (h *edgeHeap) Pop() any {
+	old := *h
+	n := len(old)
+	x := old[n-1]
+	*h = old[0 : n-1]
+	return x
+}
+
+// 将图的边信息读入堆数组
+func (h *edgeHeap) ReadGraphIntoHeapArry(ga GraphList) {
+	for i, vex := range ga {
+		for vex.Link != nil {
+			e := edge{
+				i,               //边的起始点
+				vex.Link.Adjvex, //边的终点
+				vex.Link.Weight, //权
+			}
+			*h = append(*h, e)
+			vex.Link = vex.Link.Next
+		}
+	}
+}
+
+func (ga GraphList) Kruskal() {
+	var edgesAccepted int
+	var s set.DisjSet
+	var h edgeHeap
+
+	s = set.Initialize(N, -1)   //初始化顶点的不相交集
+	h.ReadGraphIntoHeapArry(ga) //将边读入优先队列
+	heap.Init(&h)               //初始化边的优先队列
+
+	for edgesAccepted < N-1 {
+		e := heap.Pop(&h).(edge)
+		u := s.Find(set.SetType(e.From))
+		v := s.Find(set.SetType(e.To))
+		if u != v { //当前两个顶点是非连通的
+			edgesAccepted++
+			s.UnionBySize(u, v)
+			fmt.Printf("v%d->v%d	weight: %d\n", e.From, e.To, e.Weight)
+		}
+	}
+}
+
+// 关键路径算法
+func (ga GraphList) CriticalPath() {
+	var i, j, k, count int
+	var front = -1
+	var rear = -1 //顺序队列的首尾指针置初值-1
+	var tpord, vl, ve [N]int
+	var e, l [E]int
+	// for i = 0; i < N; i++ {
+	// 	ve[i] = 0 //各事件的最早发生事件均置0
+	// }
+	for i = 0; i < N; i++ { //扫描顶点表，将入度为0的顶点入队
+		if ga[i].In == 0 {
+			rear++
+			tpord[rear] = i
+		}
+	}
+
+	// 按拓扑排序顺序求出各顶点的最早发生时间Ve
+	for front != rear { //队列非空
+		front++
+		j = tpord[front] //Vj+1出队，即删去Vj+1
+		count++          //对出队顶点个数计数
+		p := ga[j].Link
+		for p != nil {
+			k = p.Adjvex //k是边<Vj+1, Vk+1>终点Vk+1的下标
+			ga[k].In--   //Vk+1入度减1
+			if ve[j]+p.Weight > ve[k] {
+				ve[k] = ve[j] + p.Weight //修改Ve[k]
+			}
+			if ga[k].In == 0 {
+				rear++
+				tpord[rear] = k //新的入度为0的顶点Vk+1入队
+			}
+			p = p.Next
+		}
+	}
+	if count < N { //存在回路，算法终止
+		fmt.Println("该AOE网络存在回路")
+		return
+	}
+
+	// 按拓扑序列的逆序求出各顶点事件的最迟发生时间Vl
+	for i = 0; i < N; i++ {
+		vl[i] = ve[N-1] //初始化vl数组，赋值为ve的最后一个事件（汇点）的最早发生时间
+	}
+	for i = N - 2; i >= 0; i-- { //按拓扑序列的逆序取顶点
+		j = tpord[i]
+		p := ga[j].Link
+		for p != nil {
+			k = p.Adjvex //为<Vj+1, Vk+1>的终点Vk+1的下标
+			if vl[k]-p.Weight < vl[j] {
+				vl[j] = vl[k] - p.Weight
+			}
+			p = p.Next
+		}
+	}
+
+	i = -1                  //边计数器置初值
+	for j = 0; j < N; j++ { //扫描顶点Vj+1的邻接表，计算<Vj+1, Vk+1>所代表的活动ai+1的e[i]和l[i]
+		p := ga[j].Link
+		for p != nil {
+			k = p.Adjvex
+			i++
+			e[i] = ve[j]
+			l[i] = vl[k] - p.Weight
+			fmt.Printf("V%s\tV%s\t%d\t%d\t%d\t", ga[j].Vertex, ga[k].Vertex, e[i], l[i], l[i]-e[i])
+			if l[i] == e[i] {
+				fmt.Println("关键活动")
+			}
+			fmt.Println()
+			p = p.Next
+		}
 	}
 }
